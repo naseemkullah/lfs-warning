@@ -1,6 +1,9 @@
-import * as core from "@actions/core";
-import * as github from "@actions/github";
-const octokit = github.getOctokit(core.getInput("token"));
+import * as core from '@actions/core';
+import * as github from '@actions/github';
+import {exec} from 'child_process';
+import {promisify} from 'util';
+const execP = promisify(exec);
+const octokit = github.getOctokit(core.getInput('token'));
 const context = github.context;
 const {owner, repo} = context.repo;
 const event_type = context.eventName;
@@ -58,7 +61,7 @@ async function run() {
 
       const prFilesWithBlobSize = await Promise.all(
         files.map(async file => {
-          const {filename, sha} = file;
+          const {filename, sha, patch} = file;
           const {data: blob} = await octokit.rest.git.getBlob({
             owner,
             repo,
@@ -69,31 +72,61 @@ async function run() {
             filename,
             filesha: sha,
             fileblobsize: blob.size,
+            patch,
           };
         })
       );
 
       core.info(String(prFilesWithBlobSize));
 
-      const lsfFiles = [];
+      const largeFiles: string[] = [];
+      const accidentallyCheckedInLsfFiles: string[] = [];
       for (const file of prFilesWithBlobSize) {
         const {fileblobsize, filename} = file;
         if (fileblobsize !== null && fileblobsize > Number(fsl)) {
-          lsfFiles.push(filename);
+          largeFiles.push(filename);
+        } else {
+          // look for files below threshold that should be stored in LFS but are not
+          const shouldBeStoredInLFS = (
+            await execP(`git check-attr filter ${filename}`)
+          ).stdout.includes('filter: lfs');
+
+          if (shouldBeStoredInLFS) {
+            const isStoredInLFS = Boolean(
+              file.patch?.includes('version https://git-lfs.github.com/spec/v1')
+            );
+            if (!isStoredInLFS) {
+              accidentallyCheckedInLsfFiles.push(filename);
+            }
+          }
         }
       }
 
+      const lsfFiles = largeFiles.concat(accidentallyCheckedInLsfFiles);
+
       if (lsfFiles.length > 0) {
-        core.info('Detected large file(s):');
+        core.info('Detected file(s) that should be in LFS:');
         core.info(String(lsfFiles));
 
-        const lfsFileNames = lsfFiles.join(', ');
-        const bodyTemplate = `## :warning: Possible large file(s) detected :warning: \n
-            The following file(s) exceeds the file size limit: ${fsl} bytes, as set in the .yml configuration files
+        const largeFilesBody = `The following file(s) exceeds the file size limit: ${100} bytes, as set in the .yml configuration files:
 
-            ${lfsFileNames.toString()}
+        ${largeFiles.join(', ')}
 
-            Consider using git-lfs as best practises to track and commit file(s)`;
+        Consider using git-lfs to manage large files.
+      `;
+
+        const accidentallyCheckedInLsfFilesBody = `The following file(s) are tracked in LFS and were likely accidentally checked in:
+
+        ${accidentallyCheckedInLsfFiles.join(', ')}
+      `;
+
+        const body = `## :warning: Possible file(s) that should be tracked in LFS detected :warning:
+        ${largeFiles.length > 0 ? largeFilesBody : ''}
+        ${
+          accidentallyCheckedInLsfFiles.length > 0
+            ? accidentallyCheckedInLsfFilesBody
+            : ''
+        }`;
 
         await octokit.rest.issues.addLabels({
           owner,
@@ -106,7 +139,7 @@ async function run() {
           owner,
           repo,
           issue_number: pullRequestNumber,
-          body: bodyTemplate,
+          body,
         });
 
         core.setOutput('lfsFiles', lsfFiles);
@@ -116,9 +149,6 @@ async function run() {
       } else {
         core.info('No large file(s) detected...');
       }
-
-      // TODO:
-      // git lfs attributes misconfiguration aka missing installation on client while git-lfs is configured on repo upstream
     } else {
       core.info('No Pull Request detected. Skipping LFS warning check');
     }
