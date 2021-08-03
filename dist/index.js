@@ -6146,14 +6146,6 @@ module.exports = require("assert");
 
 /***/ }),
 
-/***/ 129:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("child_process");
-
-/***/ }),
-
 /***/ 614:
 /***/ ((module) => {
 
@@ -6283,6 +6275,17 @@ module.exports = require("zlib");
 /******/ 	}
 /******/ 	
 /************************************************************************/
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__nccwpck_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
 /******/ 	/* webpack/runtime/compat */
 /******/ 	
 /******/ 	if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = __dirname + "/";
@@ -6292,14 +6295,23 @@ var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be in strict mode.
 (() => {
 "use strict";
-var exports = __webpack_exports__;
+// ESM COMPAT FLAG
+__nccwpck_require__.r(__webpack_exports__);
 
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core = __nccwpck_require__(186);
-const github = __nccwpck_require__(438);
-const child_process_1 = __nccwpck_require__(129);
-const util_1 = __nccwpck_require__(669);
-const execP = util_1.promisify(child_process_1.exec);
+// EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
+var core = __nccwpck_require__(186);
+// EXTERNAL MODULE: ./node_modules/@actions/github/lib/github.js
+var github = __nccwpck_require__(438);
+;// CONCATENATED MODULE: external "child_process"
+const external_child_process_namespaceObject = require("child_process");
+// EXTERNAL MODULE: external "util"
+var external_util_ = __nccwpck_require__(669);
+;// CONCATENATED MODULE: ./src/index.ts
+
+
+
+
+const execP = (0,external_util_.promisify)(external_child_process_namespaceObject.exec);
 const octokit = github.getOctokit(core.getInput('token'));
 const context = github.context;
 const { owner, repo } = context.repo;
@@ -6429,7 +6441,7 @@ async function run() {
     }
 }
 run();
-//# sourceMappingURL=index.js.map
+
 })();
 
 module.exports = __webpack_exports__;

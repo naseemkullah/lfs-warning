@@ -5,8 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "lint": "gts lint",
-    "package": "ncc build build/src/index.js -o dist",
-    "prepackage": "npm run compile",
+    "package": "ncc build src/index.ts",
     "test": "eslint index.js && jest",
     "clean": "gts clean",
     "compile": "tsc",
