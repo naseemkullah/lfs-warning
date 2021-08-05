@@ -8,7 +8,7 @@ const context = github.context;
 const {owner, repo} = context.repo;
 const event_type = context.eventName;
 
-const labels = ['lfs-detected!'];
+const labelName = 'lfs-detected!'
 
 // most @actions toolkit packages have async methods
 async function run() {
@@ -24,7 +24,7 @@ async function run() {
       await octokit.rest.issues.getLabel({
         owner,
         repo,
-        name: 'lfs-detected!',
+        name: labelName,
       });
     } catch (error) {
       if (error.message === 'Not Found') {
@@ -132,7 +132,7 @@ async function run() {
           owner,
           repo,
           issue_number: pullRequestNumber,
-          labels,
+          labels: [labelName],
         });
 
         await octokit.rest.issues.createComment({
@@ -148,6 +148,12 @@ async function run() {
         );
       } else {
         core.info('No large file(s) detected...');
+        await octokit.rest.issues.removeLabel({
+          owner,
+          repo,
+          issue_number: pullRequestNumber,
+          name: labelName
+        });
       }
     } else {
       core.info('No Pull Request detected. Skipping LFS warning check');
