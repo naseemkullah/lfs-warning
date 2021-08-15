@@ -100,6 +100,11 @@ async function run() {
 
     const lsfFiles = largeFiles.concat(accidentallyCheckedInLsfFiles);
 
+    const issueBaseProps = {
+      ...repo,
+      issue_number: pullRequestNumber
+    };
+
     if (lsfFiles.length > 0) {
       core.info('Detected file(s) that should be in LFS:');
       core.info(String(lsfFiles));
@@ -125,14 +130,12 @@ async function run() {
         }`;
 
       await octokit.rest.issues.addLabels({
-        ...repo,
-        issue_number: pullRequestNumber,
+        ...issueBaseProps,
         labels: [labelName],
       });
 
       await octokit.rest.issues.createComment({
-        ...repo,
-        issue_number: pullRequestNumber,
+        ...issueBaseProps,
         body,
       });
 
@@ -144,13 +147,11 @@ async function run() {
       core.info('No large file(s) detected...');
 
       const {data: labels} = await octokit.rest.issues.listLabelsOnIssue({
-        ...repo,
-        issue_number: 1,
+        ...issueBaseProps,
       });
       if (labels.map(l => l.name).includes(labelName)) {
         await octokit.rest.issues.removeLabel({
-          ...repo,
-          issue_number: 1,
+          ...issueBaseProps,
           name: labelName,
         });
         core.info(`label ${labelName} removed`);
