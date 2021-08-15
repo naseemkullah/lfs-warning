@@ -71,15 +71,16 @@ async function run() {
 
       const body = getCommentBody(largeFiles, accidentallyCheckedInLsfFiles);
 
-      await octokit.rest.issues.addLabels({
-        ...issueBaseProps,
-        labels: [labelName],
-      });
-
-      await octokit.rest.issues.createComment({
-        ...issueBaseProps,
-        body,
-      });
+      await Promise.all([
+        octokit.rest.issues.addLabels({
+          ...issueBaseProps,
+          labels: [labelName],
+        }),
+        octokit.rest.issues.createComment({
+          ...issueBaseProps,
+          body,
+        }),
+      ]);
 
       core.setOutput('lfsFiles', lsfFiles);
       core.setFailed(
@@ -120,7 +121,8 @@ async function getOrCreateLfsWarningLabel(labelName: string) {
         ...repo,
         name: 'lfs-detected!',
         color: 'ff1493',
-        description: 'Warning Label for use when LFS is detected in the commits of a Pull Request',
+        description:
+          'Warning Label for use when LFS is detected in the commits of a Pull Request',
       });
       core.info('No lfs warning label detected. Creating new label ...');
       core.info('LFS warning label created');
@@ -131,27 +133,28 @@ async function getOrCreateLfsWarningLabel(labelName: string) {
 }
 
 async function getPrFilesWithBlobSize(pullRequestNumber: number) {
-  const { data } = await octokit.rest.pulls.listFiles({
+  const {data} = await octokit.rest.pulls.listFiles({
     ...repo,
     pull_number: pullRequestNumber,
   });
 
   const exclusionPatterns = core.getMultilineInput('exclusionPatterns');
 
-  const files = exclusionPatterns.length > 0
-    ? data.filter(({ filename }) => {
-      const match = micromatch.isMatch(filename, exclusionPatterns);
-      if (match === false) {
-        core.info(`${filename} has been excluded from LFS warning`);
-      }
-      return match;
-    })
-    : data;
+  const files =
+    exclusionPatterns.length > 0
+      ? data.filter(({filename}) => {
+          const match = micromatch.isMatch(filename, exclusionPatterns);
+          if (match === false) {
+            core.info(`${filename} has been excluded from LFS warning`);
+          }
+          return match;
+        })
+      : data;
 
   const prFilesWithBlobSize = await Promise.all(
-    files.map(async (file) => {
-      const { filename, sha, patch } = file;
-      const { data: blob } = await octokit.rest.git.getBlob({
+    files.map(async file => {
+      const {filename, sha, patch} = file;
+      const {data: blob} = await octokit.rest.git.getBlob({
         ...repo,
         file_sha: sha,
       });
@@ -167,7 +170,10 @@ async function getPrFilesWithBlobSize(pullRequestNumber: number) {
   return prFilesWithBlobSize;
 }
 
-function getCommentBody(largeFiles: string[], accidentallyCheckedInLsfFiles: string[]) {
+function getCommentBody(
+  largeFiles: string[],
+  accidentallyCheckedInLsfFiles: string[]
+) {
   const largeFilesBody = `The following file(s) exceeds the file size limit: ${100} bytes, as set in the .yml configuration files:
 
         ${largeFiles.join(', ')}
@@ -182,8 +188,10 @@ function getCommentBody(largeFiles: string[], accidentallyCheckedInLsfFiles: str
 
   const body = `## :warning: Possible file(s) that should be tracked in LFS detected :warning:
         ${largeFiles.length > 0 ? largeFilesBody : ''}
-        ${accidentallyCheckedInLsfFiles.length > 0
-      ? accidentallyCheckedInLsfFilesBody
-      : ''}`;
+        ${
+          accidentallyCheckedInLsfFiles.length > 0
+            ? accidentallyCheckedInLsfFilesBody
+            : ''
+        }`;
   return body;
 }
