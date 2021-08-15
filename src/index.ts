@@ -1,6 +1,7 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import {exec} from 'child_process';
+import * as micromatch from 'micromatch';
 import {promisify} from 'util';
 const execP = promisify(exec);
 const octokit = github.getOctokit(core.getInput('token'));
@@ -51,10 +52,23 @@ async function run() {
 
     core.info(`The PR number is: ${pullRequestNumber}`);
 
-    const {data: files} = await octokit.rest.pulls.listFiles({
+    const {data} = await octokit.rest.pulls.listFiles({
       ...repo,
       pull_number: pullRequestNumber,
     });
+
+    const exclusionPatterns = core.getMultilineInput('exclusionPatterns');
+
+    const files =
+      exclusionPatterns.length > 0
+        ? data.filter(({filename}) => {
+            const match = micromatch.isMatch(filename, exclusionPatterns);
+            if (match === false) {
+              core.info(`${filename} has been excluded from LFS warning`);
+            }
+            return match;
+          })
+        : data;
 
     const prFilesWithBlobSize = await Promise.all(
       files.map(async file => {
@@ -102,7 +116,7 @@ async function run() {
 
     const issueBaseProps = {
       ...repo,
-      issue_number: pullRequestNumber
+      issue_number: pullRequestNumber,
     };
 
     if (lsfFiles.length > 0) {
