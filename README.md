@@ -2,8 +2,8 @@
 
 This action works to prevent both:
 
-- large files that are not LFS tracked
-- files that are LFS tracked
+- Large files that are not LFS tracked
+- Files that are LFS tracked
 
 from being checked-in in non-pointer format/not stored in LFS. The latter happens if the client does not have git-lfs installed.
 
@@ -11,8 +11,8 @@ from being checked-in in non-pointer format/not stored in LFS. The latter happen
 
 This action scans files in commits of a pull request and will mark the pull request as failed, add a `lfs-detected!` label and reply with an issue comment if any of the following is true about any of the pull request files:
 
-- the file size is greater than the configured file size limit threshold.
-- the file is tracked in LFS but is being checked-in as a regular file
+- The file size is greater than the configured file size limit threshold.
+- The file is tracked in LFS but is being checked-in as a regular file
   - the current implementation of this check is that the file has git attribute `filter: lfs` but does not contain the string `version https://git-lfs.github.com/spec/v1'`
 
 ![pr-with-lfs-detected](https://user-images.githubusercontent.com/5770369/77542326-4cc7a400-6ea6-11ea-9d16-aa99be9b3240.png)
@@ -53,3 +53,9 @@ with:
   token: ${{ secrets.GITHUB_TOKEN }} # Optional
   filesizelimit: '10485760' # 10 MB is 10485760 Bytes
 ```
+
+## Contributers
+
+- [@froi](https://github.com/froi)
+- [@decyjphr](https://github.com/decyjphr)
+- [@naseemkullah](https://github.com/naseemkullah)
