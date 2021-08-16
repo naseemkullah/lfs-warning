@@ -22,3 +22,5 @@ jobs:
         uses: ./
         with:
           filesizelimit: 10485760 # 10MB
+          exclusionPatterns: |
+            **/*.png

@@ -10416,67 +10416,19 @@ const { repo } = context;
 const event_type = context.eventName;
 async function run() {
     var _a, _b;
-    const fsl = core.getInput('filesizelimit');
+    const fsl = getFileSizeLimitBytes();
     core.info(`Default configured filesizelimit is set to ${fsl} bytes...`);
     core.info(`Name of Repository is ${repo.repo} and the owner is ${repo.owner}`);
     core.info(`Triggered event is ${event_type}`);
     const labelName = 'lfs-detected!';
-    // Get LFS Warning Label
-    try {
-        await octokit.rest.issues.getLabel({
-            ...repo,
-            name: labelName,
-        });
-    }
-    catch (error) {
-        if (error.message === 'Not Found') {
-            await octokit.rest.issues.createLabel({
-                ...repo,
-                name: 'lfs-detected!',
-                color: 'ff1493',
-                description: 'Warning Label for use when LFS is detected in the commits of a Pull Request',
-            });
-            core.info('No lfs warning label detected. Creating new label ...');
-            core.info('LFS warning label created');
-        }
-        else {
-            core.error(`getLabel error: ${error.message}`);
-        }
-    }
-    // Get List of files for Pull Request
+    await getOrCreateLfsWarningLabel(labelName);
     if (event_type === 'pull_request') {
         const pullRequestNumber = (_a = context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.number;
         if (pullRequestNumber === undefined) {
             throw new Error('Could not get PR number');
         }
         core.info(`The PR number is: ${pullRequestNumber}`);
-        const { data } = await octokit.rest.pulls.listFiles({
-            ...repo,
-            pull_number: pullRequestNumber,
-        });
-        const exclusionPatterns = core.getMultilineInput('exclusionPatterns');
-        const files = exclusionPatterns.length > 0
-            ? data.filter(({ filename }) => {
-                const match = micromatch.isMatch(filename, exclusionPatterns);
-                if (match === false) {
-                    core.info(`${filename} has been excluded from LFS warning`);
-                }
-                return match;
-            })
-            : data;
-        const prFilesWithBlobSize = await Promise.all(files.map(async (file) => {
-            const { filename, sha, patch } = file;
-            const { data: blob } = await octokit.rest.git.getBlob({
-                ...repo,
-                file_sha: sha,
-            });
-            return {
-                filename,
-                filesha: sha,
-                fileblobsize: blob.size,
-                patch,
-            };
-        }));
+        const prFilesWithBlobSize = await getPrFilesWithBlobSize(pullRequestNumber);
         core.info(String(prFilesWithBlobSize));
         const largeFiles = [];
         const accidentallyCheckedInLsfFiles = [];
@@ -10504,29 +10456,17 @@ async function run() {
         if (lsfFiles.length > 0) {
             core.info('Detected file(s) that should be in LFS:');
             core.info(String(lsfFiles));
-            const largeFilesBody = `The following file(s) exceeds the file size limit: ${100} bytes, as set in the .yml configuration files:
-
-        ${largeFiles.join(', ')}
-
-        Consider using git-lfs to manage large files.
-      `;
-            const accidentallyCheckedInLsfFilesBody = `The following file(s) are tracked in LFS and were likely accidentally checked in:
-
-        ${accidentallyCheckedInLsfFiles.join(', ')}
-      `;
-            const body = `## :warning: Possible file(s) that should be tracked in LFS detected :warning:
-        ${largeFiles.length > 0 ? largeFilesBody : ''}
-        ${accidentallyCheckedInLsfFiles.length > 0
-                ? accidentallyCheckedInLsfFilesBody
-                : ''}`;
-            await octokit.rest.issues.addLabels({
-                ...issueBaseProps,
-                labels: [labelName],
-            });
-            await octokit.rest.issues.createComment({
-                ...issueBaseProps,
-                body,
-            });
+            const body = getCommentBody(largeFiles, accidentallyCheckedInLsfFiles);
+            await Promise.all([
+                octokit.rest.issues.addLabels({
+                    ...issueBaseProps,
+                    labels: [labelName],
+                }),
+                octokit.rest.issues.createComment({
+                    ...issueBaseProps,
+                    body,
+                }),
+            ]);
             core.setOutput('lfsFiles', lsfFiles);
             core.setFailed('Large File detected! Setting PR status to failed. Consider using git-lfs to track the LFS files');
         }
@@ -10551,6 +10491,93 @@ async function run() {
 run().catch(error => {
     core.setFailed(error.message);
 });
+function getFileSizeLimitBytes() {
+    const fsl = core.getInput('filesizelimit');
+    const lastTwoChars = fsl.slice(-2).toLowerCase();
+    if (lastTwoChars === 'mb') {
+        return Number(fsl.slice(0, -2)) * 1024;
+    }
+    else if (lastTwoChars === 'gb') {
+        return Number(fsl.slice(0, -2)) * 1024 * 1024;
+    }
+    else if (lastTwoChars[1] === 'b') {
+        return fsl.slice(0, -1);
+    }
+    else {
+        return fsl;
+    }
+}
+async function getOrCreateLfsWarningLabel(labelName) {
+    try {
+        await octokit.rest.issues.getLabel({
+            ...repo,
+            name: labelName,
+        });
+    }
+    catch (error) {
+        if (error.message === 'Not Found') {
+            await octokit.rest.issues.createLabel({
+                ...repo,
+                name: 'lfs-detected!',
+                color: 'ff1493',
+                description: 'Warning Label for use when LFS is detected in the commits of a Pull Request',
+            });
+            core.info('No lfs warning label detected. Creating new label ...');
+            core.info('LFS warning label created');
+        }
+        else {
+            core.error(`getLabel error: ${error.message}`);
+        }
+    }
+}
+async function getPrFilesWithBlobSize(pullRequestNumber) {
+    const { data } = await octokit.rest.pulls.listFiles({
+        ...repo,
+        pull_number: pullRequestNumber,
+    });
+    const exclusionPatterns = core.getMultilineInput('exclusionPatterns');
+    const files = exclusionPatterns.length > 0
+        ? data.filter(({ filename }) => {
+            const match = micromatch.isMatch(filename, exclusionPatterns);
+            if (match === false) {
+                core.info(`${filename} has been excluded from LFS warning`);
+            }
+            return match;
+        })
+        : data;
+    const prFilesWithBlobSize = await Promise.all(files.map(async (file) => {
+        const { filename, sha, patch } = file;
+        const { data: blob } = await octokit.rest.git.getBlob({
+            ...repo,
+            file_sha: sha,
+        });
+        return {
+            filename,
+            filesha: sha,
+            fileblobsize: blob.size,
+            patch,
+        };
+    }));
+    return prFilesWithBlobSize;
+}
+function getCommentBody(largeFiles, accidentallyCheckedInLsfFiles) {
+    const largeFilesBody = `The following file(s) exceeds the file size limit: ${100} bytes, as set in the .yml configuration files:
+
+        ${largeFiles.join(', ')}
+
+        Consider using git-lfs to manage large files.
+      `;
+    const accidentallyCheckedInLsfFilesBody = `The following file(s) are tracked in LFS and were likely accidentally checked in:
+
+        ${accidentallyCheckedInLsfFiles.join(', ')}
+      `;
+    const body = `## :warning: Possible file(s) that should be tracked in LFS detected :warning:
+        ${largeFiles.length > 0 ? largeFilesBody : ''}
+        ${accidentallyCheckedInLsfFiles.length > 0
+        ? accidentallyCheckedInLsfFilesBody
+        : ''}`;
+    return body;
+}
 
 })();
 

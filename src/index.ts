@@ -10,7 +10,7 @@ const {repo} = context;
 const event_type = context.eventName;
 
 async function run() {
-  const fsl = core.getInput('filesizelimit');
+  const fsl = getFileSizeLimitBytes();
 
   core.info(`Default configured filesizelimit is set to ${fsl} bytes...`);
   core.info(
@@ -108,6 +108,22 @@ async function run() {
 run().catch(error => {
   core.setFailed(error.message);
 });
+
+function getFileSizeLimitBytes() {
+  const fsl = core.getInput('filesizelimit');
+
+  const lastTwoChars = fsl.slice(-2).toLowerCase();
+
+  if (lastTwoChars === 'mb') {
+    return Number(fsl.slice(0, -2)) * 1024;
+  } else if (lastTwoChars === 'gb') {
+    return Number(fsl.slice(0, -2)) * 1024 * 1024;
+  } else if (lastTwoChars[1] === 'b') {
+    return fsl.slice(0, -1);
+  } else {
+    return fsl;
+  }
+}
 
 async function getOrCreateLfsWarningLabel(labelName: string) {
   try {
