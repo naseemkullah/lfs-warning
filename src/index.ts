@@ -115,9 +115,9 @@ function getFileSizeLimitBytes() {
   const lastTwoChars = fsl.slice(-2).toLowerCase();
 
   if (lastTwoChars === 'mb') {
-    return Number(fsl.slice(0, -2)) * 1024;
-  } else if (lastTwoChars === 'gb') {
     return Number(fsl.slice(0, -2)) * 1024 * 1024;
+  } else if (lastTwoChars === 'gb') {
+    return Number(fsl.slice(0, -2)) * 1024 * 1024 * 1024;
   } else if (lastTwoChars[1] === 'b') {
     return fsl.slice(0, -1);
   } else {

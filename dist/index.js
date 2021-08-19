@@ -10495,10 +10495,10 @@ function getFileSizeLimitBytes() {
     const fsl = core.getInput('filesizelimit');
     const lastTwoChars = fsl.slice(-2).toLowerCase();
     if (lastTwoChars === 'mb') {
-        return Number(fsl.slice(0, -2)) * 1024;
+        return Number(fsl.slice(0, -2)) * 1024 * 1024;
     }
     else if (lastTwoChars === 'gb') {
-        return Number(fsl.slice(0, -2)) * 1024 * 1024;
+        return Number(fsl.slice(0, -2)) * 1024 * 1024 * 1024;
     }
     else if (lastTwoChars[1] === 'b') {
         return fsl.slice(0, -1);
@@ -10538,11 +10538,11 @@ async function getPrFilesWithBlobSize(pullRequestNumber) {
     const exclusionPatterns = core.getMultilineInput('exclusionPatterns');
     const files = exclusionPatterns.length > 0
         ? data.filter(({ filename }) => {
-            const match = micromatch.isMatch(filename, exclusionPatterns);
-            if (match === false) {
+            const isExcluded = micromatch.isMatch(filename, exclusionPatterns);
+            if (isExcluded) {
                 core.info(`${filename} has been excluded from LFS warning`);
             }
-            return match;
+            return !isExcluded;
         })
         : data;
     const prFilesWithBlobSize = await Promise.all(files.map(async (file) => {
