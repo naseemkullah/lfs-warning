@@ -1,9 +1,10 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import {exec} from 'child_process';
+import {execFile} from 'child_process';
 import * as micromatch from 'micromatch';
 import {promisify} from 'util';
-const execP = promisify(exec);
+
+const execFileP = promisify(execFile);
 const octokit = github.getOctokit(core.getInput('token'));
 const context = github.context;
 const {repo} = context;
@@ -44,7 +45,7 @@ async function run() {
       } else {
         // look for files below threshold that should be stored in LFS but are not
         const shouldBeStoredInLFS = (
-          await execP(`git check-attr filter ${filename}`)
+          await execFileP('git', ['check-attr', 'filter', filename])
         ).stdout.includes('filter: lfs');
 
         if (shouldBeStoredInLFS) {

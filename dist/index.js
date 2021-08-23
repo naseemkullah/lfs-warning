@@ -10409,7 +10409,7 @@ var external_util_ = __nccwpck_require__(1669);
 
 
 
-const execP = (0,external_util_.promisify)(external_child_process_namespaceObject.exec);
+const execFileP = (0,external_util_.promisify)(external_child_process_namespaceObject.execFile);
 const octokit = github.getOctokit(core.getInput('token'));
 const context = github.context;
 const { repo } = context;
@@ -10439,7 +10439,7 @@ async function run() {
             }
             else {
                 // look for files below threshold that should be stored in LFS but are not
-                const shouldBeStoredInLFS = (await execP(`git check-attr filter ${filename}`)).stdout.includes('filter: lfs');
+                const shouldBeStoredInLFS = (await execFileP('git', ['check-attr', 'filter', filename])).stdout.includes('filter: lfs');
                 if (shouldBeStoredInLFS) {
                     const isStoredInLFS = Boolean((_b = file.patch) === null || _b === void 0 ? void 0 : _b.includes('version https://git-lfs.github.com/spec/v1'));
                     if (!isStoredInLFS) {
